@@ -146,10 +146,18 @@ function uploadImage(file) {
     message: chrome.i18n.getMessage("picUploading"),
     autoClose: false
   });
-  uploadImageNow(file);
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const base64String = e.target.result;
+      uploadImageNow(base64String, file);
+    };
+    reader.onerror = function(error) {
+      console.error('Error reading file:', error);
+    };
+    reader.readAsDataURL(file);
 };
 
-function uploadImageNow(file) {
+function uploadImageNow(base64String, file) {
   get_info(function(info) {
     if (info.status) {
       let old_name = file.name.split('.');
@@ -167,18 +175,22 @@ function uploadImageNow(file) {
           sendvisi = 'PRIVATE'
         }
       }
-      const formData = new FormData();
-      // Create a new file with the renamed filename
-      const renamedFile = new File([file], new_name, { type: file.type });
-      formData.append('file', renamedFile);
+      const data = {
+        attachment: {
+          content: base64String,
+          filename: new_name,
+          type: file.type
+        }
+      };
       var upAjaxUrl = info.apiUrl + 'api/v1/attachments';
       $.ajax({
         url: upAjaxUrl,
-        data: formData,
-        type: 'post',
+        data: JSON.stringify(data),
+        type: 'put',
         cache: false,
         processData: false,
-        contentType: false,
+        contentType: 'application/json',
+        dataType: 'json',
         headers: { 'Authorization': 'Bearer ' + info.apiTokens },
         success: function (data) {
           // 0.24 版本+ 返回体uid已合并到name字段
@@ -218,7 +230,13 @@ function uploadImageNow(file) {
           }
         },
         error: function (xhr, status, error) {
-          console.error('Upload failed:', xhr.responseText, status, error);
+          console.error('Upload failed:', {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            responseText: xhr.responseText,
+            error: error,
+            url: upAjaxUrl
+          });
           chrome.storage.sync.set(
             {
               open_action: '',
@@ -227,7 +245,7 @@ function uploadImageNow(file) {
             },
             function () {
               $.message({
-                message: chrome.i18n.getMessage("picFailed") + ': ' + error
+                message: chrome.i18n.getMessage("picFailed") + ': ' + xhr.status + ' ' + error
               })
             }
           )
