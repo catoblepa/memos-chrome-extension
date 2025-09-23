@@ -146,18 +146,10 @@ function uploadImage(file) {
     message: chrome.i18n.getMessage("picUploading"),
     autoClose: false
   });
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const base64String = e.target.result.split(',')[1];
-      uploadImageNow(base64String, file);
-    };
-    reader.onerror = function(error) {
-      console.error('Error reading file:', error);
-    };
-    reader.readAsDataURL(file);
+  uploadImageNow(file);
 };
 
-function uploadImageNow(base64String, file) {
+function uploadImageNow(file) {
   get_info(function(info) {
     if (info.status) {
       let old_name = file.name.split('.');
@@ -175,22 +167,18 @@ function uploadImageNow(base64String, file) {
           sendvisi = 'PRIVATE'
         }
       }
-      const data = {
-        attachment: {
-          content: base64String,
-          filename: new_name,
-          type: file.type
-        }
-      };
+      const formData = new FormData();
+      // Create a new file with the renamed filename
+      const renamedFile = new File([file], new_name, { type: file.type });
+      formData.append('file', renamedFile);
       var upAjaxUrl = info.apiUrl + 'api/v1/attachments';
       $.ajax({
         url: upAjaxUrl,
-        data: JSON.stringify(data),
+        data: formData,
         type: 'post',
         cache: false,
         processData: false,
-        contentType: 'application/json',
-        dataType: 'json',
+        contentType: false,
         headers: { 'Authorization': 'Bearer ' + info.apiTokens },
         success: function (data) {
           // 0.24 版本+ 返回体uid已合并到name字段
@@ -228,6 +216,21 @@ function uploadImageNow(base64String, file) {
               }
             )
           }
+        },
+        error: function (xhr, status, error) {
+          console.error('Upload failed:', xhr.responseText, status, error);
+          chrome.storage.sync.set(
+            {
+              open_action: '',
+              open_content: '',
+              resourceIdList: []
+            },
+            function () {
+              $.message({
+                message: chrome.i18n.getMessage("picFailed") + ': ' + error
+              })
+            }
+          )
         }
       });
     }else {
