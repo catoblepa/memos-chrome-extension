@@ -169,7 +169,7 @@ function uploadImageNow(file) {
       }
       const formData = new FormData();
       const renamedFile = new File([file], new_name, { type: file.type });
-      formData.append('file', renamedFile);
+      formData.append('attachment', renamedFile);
       var upAjaxUrl = info.apiUrl + 'api/v1/attachments';
       $.ajax({
         url: upAjaxUrl,
