@@ -176,17 +176,15 @@ function uploadImageNow(base64String, file) {
         }
       }
       const data = {
-        attachment: {
-          content: base64String,
-          filename: new_name,
-          type: file.type
-        }
+        content: base64String,
+        filename: new_name,
+        type: file.type
       };
-      var upAjaxUrl = info.apiUrl + 'api/v1/attachments';
+      var upAjaxUrl = info.apiUrl + 'api/v1/resources';
       $.ajax({
         url: upAjaxUrl,
         data: JSON.stringify(data),
-        type: 'put',
+        type: 'post',
         cache: false,
         processData: false,
         contentType: 'application/json',
