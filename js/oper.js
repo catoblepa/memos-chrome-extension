@@ -228,13 +228,8 @@ function uploadImageNow(base64String, file) {
           }
         },
         error: function (xhr, status, error) {
-          console.error('Upload failed:', {
-            status: xhr.status,
-            statusText: xhr.statusText,
-            responseText: xhr.responseText,
-            error: error,
-            url: upAjaxUrl
-          });
+          console.error('Upload failed - Status:', xhr.status, 'Error:', error, 'URL:', upAjaxUrl);
+          console.error('Response:', xhr.responseText);
           chrome.storage.sync.set(
             {
               open_action: '',
