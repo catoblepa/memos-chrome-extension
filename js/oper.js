@@ -1,5 +1,5 @@
 dayjs.extend(window.dayjs_plugin_relativeTime)
-dayjs.locale('zh-cn')
+dayjs.locale('en')
 
 function get_info(callback) {
   chrome.storage.sync.get(
@@ -176,12 +176,13 @@ function uploadImageNow(base64String, file) {
         }
       }
       const data = {
-        content: base64String,
-        visibility: sendvisi,
-        filename: new_name,
-        type: file.type
+        attachment: {
+          content: base64String,
+          filename: new_name,
+          type: file.type
+        }
       };
-      var upAjaxUrl = info.apiUrl + 'api/v1/resources';
+      var upAjaxUrl = info.apiUrl + 'api/v1/attachments';
       $.ajax({
         url: upAjaxUrl,
         data: JSON.stringify(data),
@@ -247,18 +248,18 @@ $('#saveKey').click(function () {
   const settings = {
     async: true,
     crossDomain: true,
-    url: apiUrl + 'api/v1/auth/status',
-    method: 'POST',
+    url: apiUrl + 'api/v1/auth/sessions/current',
+    method: 'GET',
     headers: {
       'Authorization': 'Bearer ' + apiTokens
     }
   };
 
   $.ajax(settings).done(function (response) {
-    // 0.24 版本后无 id 字段，改为从 name 字段获取和判断认证是否成功
-    if (response && response.name) {
+    // v0.25+ API returns user object
+    if (response && response.user && response.user.name) {
       // 如果响应包含用户name "users/{id}"，存储 apiUrl 和 apiTokens
-      var userid = parseInt(response.name.split('/').pop(), 10)
+      var userid = parseInt(response.user.name.split('/').pop(), 10)
       chrome.storage.sync.set(
         {
           apiUrl: apiUrl,
@@ -298,7 +299,7 @@ $('#tags').click(function () {
     if (info.apiUrl) {
       var parent = `users/${info.userid}`;
       // 从最近的1000条memo中获取tags,因此不保证获取能全部的
-      var tagUrl = info.apiUrl + 'api/v1/' + parent + '/memos?pageSize=1000';
+      var tagUrl = info.apiUrl + 'api/v1/memos?pageSize=1000&filter=' + encodeURIComponent('creator == "' + parent + '"');
       var tagDom = "";
       $.ajax({
         url: tagUrl,
@@ -362,13 +363,13 @@ $('#search').click(function () {
   get_info(function (info) {
   const pattern = $("textarea[name=text]").val()
   var parent = `users/${info.userid}`;
-  var filter = "?filter=" + encodeURIComponent(`visibility in ["PUBLIC","PROTECTED"] && content.contains("${pattern}")`);
+  var filter = "?filter=" + encodeURIComponent(`creator == "${parent}" && visibility in ["PUBLIC","PROTECTED"] && content.contains("${pattern}")`);
   if (info.status) {
     $("#randomlist").html('').hide()
     var searchDom = ""
     if(pattern){
       $.ajax({
-        url:info.apiUrl+"api/v1/"+parent+"/memos"+filter,
+        url:info.apiUrl+"api/v1/memos"+filter,
         type:"GET",
         contentType:"application/json",
         dataType:"json",
@@ -392,7 +393,7 @@ $('#search').click(function () {
                   if(resexlink){
                     resLink = resexlink
                   }else{
-                    fileId = resources[j].publicId || resources[j].filename
+                    fileId = resources[j].filename
                     resLink = info.apiUrl+'file/'+resources[j].name+'/'+fileId
                 }
                   if(restype == 'image'){
@@ -426,10 +427,10 @@ $('#search').click(function () {
 $('#random').click(function () {
   get_info(function (info) {
     var parent = `users/${info.userid}`;
-    var filter = "?filter=" + encodeURIComponent(`visibility in ["PUBLIC","PROTECTED"]`);
+    var filter = "?filter=" + encodeURIComponent(`creator == "${parent}" && visibility in ["PUBLIC","PROTECTED"]`);
     if (info.status) {
       $("#randomlist").html('').hide()
-      var randomUrl = info.apiUrl + "api/v1/" +parent + "/memos" + filter;
+      var randomUrl = info.apiUrl + "api/v1/memos" + filter;
       $.ajax({
         url:randomUrl,
         type:"GET",
@@ -463,7 +464,7 @@ function randDom(randomData){
       if(resexlink){
         resLink = resexlink
       }else{
-        fileId = resources[j].publicId || resources[j].filename
+        fileId = resources[j].filename
         resLink = info.apiUrl+'file/'+resources[j].name+'/'+fileId
       }
       if(restype == 'image'){
@@ -496,8 +497,8 @@ get_info(function (info) {
     url:deleteUrl,
     type:"PATCH",
     data:JSON.stringify({
-      // 'uid': memoUid,
-      'state': "ARCHIVED"
+      memo: { name: memosName, state: "ARCHIVED" },
+      update_mask: ["state"]
     }),
     contentType:"application/json",
     dataType:"json",
@@ -638,10 +639,10 @@ function sendText() {
           if(info.resourceIdList.length > 0 ){
             //匹配图片
             $.ajax({
-              url:info.apiUrl+'api/v1/'+data.name,
+              url:info.apiUrl+'api/v1/'+data.name + '/attachments',
               type:"PATCH",
               data:JSON.stringify({
-                'resources': info.resourceIdList || [],
+                attachments: info.resourceIdList.map(name => ({ name })) || []
               }),
               contentType:"application/json",
               dataType:"json",
