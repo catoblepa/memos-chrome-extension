@@ -313,7 +313,8 @@ $('#tags').click(function () {
     if (info.apiUrl) {
       var parent = `users/${info.userid}`;
       // 从最近的1000条memo中获取tags,因此不保证获取能全部的
-      var tagUrl = info.apiUrl + 'api/v1/memos?pageSize=1000&filter=' + encodeURIComponent('creator == "' + parent + '"');
+      // Rimosso filtro creator per compatibilità v0.25.2
+      var tagUrl = info.apiUrl + 'api/v1/memos?pageSize=1000';
       var tagDom = "";
       $.ajax({
         url: tagUrl,
@@ -323,13 +324,19 @@ $('#tags').click(function () {
         headers: { 'Authorization': 'Bearer ' + info.apiTokens },
         success: function (data) {
           // 提前并去重所有标签
-          const allTags = data.memos.flatMap(memo => memo.tags);
+          const allTags = data.memos ? data.memos.flatMap(memo => memo.tags || []) : [];
           const uniTags = [...new Set(allTags)];
           $.each(uniTags, function (_, tag) {
             tagDom += '<span class="item-container">#' + tag + '</span>';
           });
           tagDom += '<svg id="hideTag" class="hidetag" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M78.807 362.435c201.539 314.275 666.962 314.188 868.398-.241 16.056-24.99 13.143-54.241-4.04-62.54-17.244-8.377-40.504 3.854-54.077 24.887-174.484 272.338-577.633 272.41-752.19.195-13.573-21.043-36.874-33.213-54.113-24.837-17.177 8.294-20.06 37.545-3.978 62.536z" fill="#fff"/><path d="M894.72 612.67L787.978 494.386l38.554-34.785 106.742 118.251-38.554 34.816zM635.505 727.51l-49.04-147.123 49.255-16.41 49.054 147.098-49.27 16.435zm-236.18-12.001l-49.568-15.488 43.29-138.48 49.557 15.513-43.28 138.455zM154.49 601.006l-38.743-34.565 95.186-106.732 38.763 34.566-95.206 106.731z" fill="#fff"/></svg>'
           $("#taglist").html(tagDom).slideToggle(500)
+        },
+        error: function(xhr, status, error) {
+          console.error('Tags API Error:', xhr.status, xhr.responseText);
+          $.message({
+            message: 'Tags Error: ' + xhr.status + ' ' + error
+          })
         }
       })
     } else {
@@ -377,19 +384,26 @@ $('#search').click(function () {
   get_info(function (info) {
   const pattern = $("textarea[name=text]").val()
   var parent = `users/${info.userid}`;
-  var filter = "?filter=" + encodeURIComponent(`creator == "${parent}" && visibility in ["PUBLIC","PROTECTED"] && content.contains("${pattern}")`);
+  // Rimosso filtro complesso per compatibilità v0.25.2 - filtriamo lato client
   if (info.status) {
     $("#randomlist").html('').hide()
     var searchDom = ""
     if(pattern){
       $.ajax({
-        url:info.apiUrl+"api/v1/memos"+filter,
+        url:info.apiUrl+"api/v1/memos?pageSize=1000",
         type:"GET",
         contentType:"application/json",
         dataType:"json",
         headers : {'Authorization':'Bearer ' + info.apiTokens},
         success: function(data){
-          let searchData = data.memos
+          // Filtra i memo lato client per pattern (include anche memo privati)
+          let allMemos = data.memos || [];
+          let searchData = allMemos.filter(memo => {
+            const matchesContent = memo.content.toLowerCase().includes(pattern.toLowerCase());
+            // Includi tutti i tipi di memo: PRIVATE, PROTECTED, PUBLIC
+            return matchesContent;
+          });
+          
           if(searchData.length == 0){
             $.message({
               message: chrome.i18n.getMessage("searchNone")
@@ -423,6 +437,12 @@ $('#search').click(function () {
             window.ViewImage && ViewImage.init('.random-image')
             $("#randomlist").html(searchDom).slideDown(500);
           }
+        },
+        error: function(xhr, status, error) {
+          console.error('Search API Error:', xhr.status, xhr.responseText);
+          $.message({
+            message: 'Search Error: ' + xhr.status + ' ' + error
+          })
         }
       });
     }else{
@@ -441,10 +461,10 @@ $('#search').click(function () {
 $('#random').click(function () {
   get_info(function (info) {
     var parent = `users/${info.userid}`;
-    var filter = "?filter=" + encodeURIComponent(`creator == "${parent}" && visibility in ["PUBLIC","PROTECTED"]`);
+    // Aggiornato per v0.25.2 - rimuovi filtro che causa 400 error
+    var randomUrl = info.apiUrl + "api/v1/memos?pageSize=100";
     if (info.status) {
       $("#randomlist").html('').hide()
-      var randomUrl = info.apiUrl + "api/v1/memos" + filter;
       $.ajax({
         url:randomUrl,
         type:"GET",
@@ -452,9 +472,21 @@ $('#random').click(function () {
         dataType:"json",
         headers : {'Authorization':'Bearer ' + info.apiTokens},
         success: function(data){
-          let randomNum = Math.floor(Math.random() * (data.memos.length));
-          var randomData = data.memos[randomNum]
-          randDom(randomData)
+          if (data.memos && data.memos.length > 0) {
+            let randomNum = Math.floor(Math.random() * (data.memos.length));
+            var randomData = data.memos[randomNum]
+            randDom(randomData)
+          } else {
+            $.message({
+              message: 'No memos found'
+            })
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error('Random API Error:', xhr.status, xhr.responseText);
+          $.message({
+            message: 'Random Error: ' + xhr.status + ' ' + error
+          })
         }
       })
     } else {
