@@ -586,12 +586,21 @@ $('#getlink').click(function () {
   })
 })
 
+// Upload funzionalità temporaneamente disabilitata per problemi di compatibilità Chrome
+$('#upres').click(function () {
+  $.message({
+    message: 'Upload file temporaneamente non disponibile'
+  });
+});
+
+// Funzionalità originale commentata per evitare crash
+/*
 $('#upres').click(async function () {
   $('#inFile').click()
 })
 
-$('#inFile').on('change', function(data){
-  var fileVal = $('#inFile').val();
+$('#inFile').on('change', function(data){
+  var fileVal = $('#inFile').val();
   var file = null
   if(fileVal == '') {
     return;
@@ -599,6 +608,7 @@ $('#inFile').on('change', function(data){
   file= this.files[0];
   uploadImage(file)
 });
+*/
 
 function add(str) {
   var tc = document.getElementById("content");
