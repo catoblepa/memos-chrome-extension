@@ -543,8 +543,7 @@ get_info(function (info) {
     url:deleteUrl,
     type:"PATCH",
     data:JSON.stringify({
-      memo: { name: memosName, state: "ARCHIVED" },
-      update_mask: ["state"]
+      state: "ARCHIVED"
     }),
     contentType:"application/json",
     dataType:"json",
